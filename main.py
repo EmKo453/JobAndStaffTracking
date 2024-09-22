@@ -23,18 +23,18 @@ def read_scanner():
         # Function call when message received
         client.on_message= on_message
 
-        time.sleep(5)
+        time.sleep(1)
 
         client.loop_stop()
 # READ_SCANNER
 
 # ON_MESSAGE
-def on_message(message):
+def on_message(client, userdata, message):
     # Extracts the values from a message received from the MQTT broker
     # Adds employee/job scan to the database
     # Inputs: message - string message received from MQTT broker
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     # Print message
@@ -74,7 +74,7 @@ def add_job_scan_to_db_tables(id, timestamp, datetimestamp, location):
     # Closes a job by updating the stop time of the jobs table and adding "stop" entries to the scan event table
     # Inputs: id - job id, timestamp - string timestamp, datetimestamp - datetime timestamp, location - station name
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     if (is_duplicate(id, location)):
@@ -123,7 +123,7 @@ def add_employee_scan_to_db_tables(id, timestamp, datetimestamp, location):
     # Closes an employee by updating the stop time of the employees table and adding "stop" entries to the scan event table
     # Inputs: id - employee id, timestamp - string timestamp, datetimestamp - datetime timestamp, location - station name
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     if (is_duplicate(id, location)):
@@ -145,24 +145,18 @@ def add_employee_scan_to_db_tables(id, timestamp, datetimestamp, location):
         mycursor.execute("INSERT INTO " + setup.scan_event + " (TIMESTAMP, STATION, JOB_ID, EMPLOYEE_ID, JOB_STATUS, EMPLOYEE_STATUS) VALUES (%s, %s, %s, %s, %s, %s)", values)
     else:
         # Start employee at the station
-        values = (id, location, timestamp, None, ("0:00:00"), None, None, 0)
-        mycursor.execute("INSERT INTO " + setup.employee_table + " (EMPLOYEE_ID, STATION, START, STOP, DURATION, WARNINGS, CORRESPONDING_JOBS, BREAK_TIME) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", values)
-
+        values = (id, location, timestamp, None, ("0:00:00"), None, 0)
+        mycursor.execute("INSERT INTO " + setup.employee_table + " (EMPLOYEE_ID, STATION, START, STOP, DURATION, WARNINGS, BREAK_TIME) VALUES (%s, %s, %s, %s, %s, %s, %s)", values)
         values = (datetimestamp, location, None, id, None, "START")
         mycursor.execute("INSERT INTO " + setup.scan_event + " (TIMESTAMP, STATION, JOB_ID, EMPLOYEE_ID, JOB_STATUS, EMPLOYEE_STATUS) VALUES (%s, %s, %s, %s, %s, %s)", values)
-
         # Sign employee into the open job
         mycursor.execute("SELECT * FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION=%s", ([location]))
         jobs = mycursor.fetchall()
-
         for i in jobs:
             values = (datetimestamp, location, i[0], id, None, "IN")
             mycursor.execute("INSERT INTO " + setup.scan_event + " (TIMESTAMP, STATION, JOB_ID, EMPLOYEE_ID, JOB_STATUS, EMPLOYEE_STATUS) VALUES (%s, %s, %s, %s, %s, %s)", values)
-        
         increment_maximum_FTEs(id)
-        add_corresponding_job_to_employees(id)
         mydb.commit()
-
     mydb.commit()
     mycursor.close()
     mydb.close()
@@ -174,7 +168,7 @@ def is_duplicate(id, location):
     # Returns true if job/employee is open at a location, false if not
     # Inputs: id - job or employee ID, location - station name
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     # Check if an open job or employee is already at the station
@@ -202,7 +196,7 @@ def set_duration_of_all_data(current_time):
     # Loops through all open jobs and employees at the station and updates their duration
     # Inputs: current_time - current time in datetime format
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     # Get all open jobs at the station
@@ -217,7 +211,7 @@ def set_duration_of_all_data(current_time):
     data = mycursor.fetchall()
     # Update the duration of all open employees
     for i in data:
-        update_duration(i[0],i[2], None, current_time, i[7])
+        update_duration(i[0],i[2], None, current_time, i[6])
 
     mycursor.close()
     mydb.close()
@@ -231,7 +225,7 @@ def update_duration(id, start, stop, current_time, break_time):
     # Inputs: id - job/employee id, start - start time string, stop - stop time string, current_time - current_time in datetime format,
     # break_time - integer of break time minutes
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     break_time = datetime.timedelta(hours=0, minutes=break_time, seconds=0)
@@ -280,7 +274,7 @@ def get_start_time_of_open_entry(id, location):
     # Returns none if employee/job could not be found
     # Inputs: id - job/employee id, location - station name
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     if (id[0] == 'E'):
@@ -301,7 +295,7 @@ def increment_maximum_FTEs(id):
     # Finds the current maximum number of employees and updates it if greater than previous value
     # Inputs: id - job or employee id
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     if (id[0] == 'E'):
@@ -351,10 +345,10 @@ def calculate_total_FTE_hours(id, location, start, stop, current_time, break_tim
     # Inputs: id - job/employee id, location - station name, start - string start time, stop - string stop time,
     # current_time - datetime current time, break_time - integer minutes of break time
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
-    break_time = datetime.timedelta(hours=0, minutes=break_time, seconds=0)
+    break_time = datetime.timedelta(hours=0, minutes=int(break_time), seconds=0)
 
     job_start_time = convert_string_to_datetime(start)
 
@@ -424,7 +418,7 @@ def total_location_FTEs_over_time():
         }
 
     # Connect to SQL database and create a cursor for queries
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     no_FTEs = 0
@@ -461,18 +455,18 @@ def calculate_no_of_employees_per_hour():
     # Calculates the number of employees per hour for a job
     # Example: 4 total employees worked on a job for 2 hours, employees per hour would be 2
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     current_time = datetime.datetime.now()
-    today_date = current_time.date()
+    today_date = str(current_time.date())
 
     # Get all open jobs
     mycursor.execute("SELECT * FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
     job = mycursor.fetchall()
 
     # Get all open and closed employees that worked today
-    mycursor.execute("SELECT * FROM " + setup.employee_table + " WHERE START LIKE '%" + today_date + " AND STATION=%s", ([setup.Location_name]))
+    mycursor.execute("SELECT * FROM " + setup.employee_table + " WHERE STATION=%s AND START LIKE '%" + today_date + "'", ([setup.Location_name]))
     employees = mycursor.fetchall()
 
     for i in job:
@@ -498,44 +492,14 @@ def calculate_no_of_employees_per_hour():
                     no_of_employees += 1
             start_time = start_time + timedelta(hours=1)
             count += 1
-
-        employees_per_hour = no_of_employees / job_duration_hour    
+        
+        employees_per_hour = no_of_employees / job_duration_hour   
         mycursor.execute("UPDATE " + setup.job_table + " SET EMPLOYEES_PER_HOUR=%s WHERE JOB_ID=%s AND STATION=%s AND START=%s AND STOP IS NULL", (employees_per_hour, i[0], i[1], i[2]))
 
     mydb.commit()
     mycursor.close()
     mydb.close()
-# CALCULATE_NO_OF_EMPLOYEES_PER_HOUR
-
-# ADD_CORRESPONDING_JOB_TO_EMPLOYEES
-def add_corresponding_job_to_employees(id):
-    # Create a list of jobs employees worked on at a station
-    # Example: Corresponding Jobs = 1, 15
-    # Inputs: id - employee or job ID
-
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
-    mycursor = mydb.cursor() 
-
-    if (id[0] == 'E'):
-        mycursor.execute("SELECT * FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
-        job = mycursor.fetchall()
-        for i in job:
-            mycursor.execute("UPDATE " + setup.employee_table + " SET CORRESPONDING_JOBS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (i[0], id, setup.Location_name))
-    else:
-        mycursor.execute("SELECT * FROM " + setup.employee_table + " WHERE STATION=%s AND STOP IS NULL", ([setup.Location_name]))
-        employees = mycursor.fetchall()
-        for i in employees:
-            if (i[6] == None):
-                mycursor.execute("UPDATE " + setup.employee_table + " SET CORRESPONDING_JOBS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (id, i[0], setup.Location_name))
-            else:
-                corresponding_jobs = i[6]
-                corresponding_jobs = corresponding_jobs + ", " + id
-                mycursor.execute("UPDATE " + setup.employee_table + " SET CORRESPONDING_JOBS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (corresponding_jobs, i[0], setup.Location_name))
-
-    mydb.commit()
-    mycursor.close()
-    mydb.close()
-# ADD_CORRESPONDING_JOB_TO_EMPLOYEES  
+# CALCULATE_NO_OF_EMPLOYEES_PER_HOUR 
 
 # CHECK_FOR_WARNINGS
 def check_for_warnings():
@@ -546,8 +510,8 @@ def check_for_warnings():
 def check_for_multiple_open_jobs_or_employees():
     # Checks whether a job or employee is open at multiple stations at once
     # Adds a warning message if job/employee is open at multiple stations at once
-
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    print("here")
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     # Obtain all open jobs at the station
@@ -559,7 +523,7 @@ def check_for_multiple_open_jobs_or_employees():
     employees = mycursor.fetchall()
 
     # Obtain all open job IDs at all other stations
-    mycursor.execute("SELECT JOB_ID FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION!=%s")
+    mycursor.execute("SELECT JOB_ID FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION!=%s", ([setup.Location_name]))
     job_df = mycursor.fetchall()
     job_df = pd.DataFrame(job_df, columns=["JOB_ID"])
 
@@ -581,13 +545,14 @@ def check_for_multiple_open_jobs_or_employees():
     # If employee is open at multiple locations add warning message
     for j in employees:
         if (j[0] in employee_df.values):
+            print("yes")
             if (j[5] == None):
                 warning = "MULTIPLE OPEN EMPLOYEES"
                 mycursor.execute("UPDATE " + setup.employee_table + " SET WARNINGS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (warning, j[0], setup.Location_name))
             elif (j[5].find("MULTIPLE OPEN EMPLOYEES")):
                 warning = j[5] + ", MULTIPLE OPEN EMPLOYEES"
             mycursor.execute("UPDATE " + setup.employee_table + " SET WARNINGS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (warning, j[0], setup.Location_name))
-
+    print("stop here")
     mydb.commit()
     mycursor.close()
     mydb.close()
@@ -598,7 +563,7 @@ def close_old_jobs_and_employees():
     # Closed jobs and employees that started the previous day and weren't closed
     # Sets the stop time to a default value of 23:59:59
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     current_time = datetime.datetime.now()
@@ -654,7 +619,7 @@ def check_for_breaks():
     # Checks whether a break has occurred for a job/employee
     # Updates the break time of a job/employee if a break has occurred
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     current_time = datetime.datetime.now().time()
@@ -675,7 +640,7 @@ def check_for_breaks():
             # If break occurred while job open, increment break value
             if (breakT >= start.time() and breakT <= current_time):
                 breakTime = breakTime + j[1]
-        if (i[7] != breakTime):
+        if (i[6] != breakTime):
             mycursor.execute("UPDATE " + setup.employee_table + " SET BREAK_TIME=%s WHERE EMPLOYEE_ID=%s",(breakTime, i[0]))
 
     mycursor.execute("SELECT * FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
@@ -723,18 +688,18 @@ layout = go.Layout(
 )
 
 # Connect to SQL database and create a cursor
-mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
 mycursor = mydb.cursor()
 
 # Execute queries to obtain job and employee data
 mycursor.execute("SELECT JOB_ID, START, STOP, DURATION, MAX_NO_FTES, EMPLOYEES_PER_HOUR, TOTAL_FTE_HOURS FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
 job_data = mycursor.fetchall()
-mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION, CORRESPONDING_JOBS FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
+mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
 employee_data = mycursor.fetchall()
 
 # Initialize dataframes for job and employee tables in dash app
 df1 = pd.DataFrame(job_data, columns=["JOB_ID", "START", "STOP", "DURATION", "MAX_NO_FTES", "EMPLOYEES_PER_HOUR", "TOTAL_FTE_HOURS"])
-df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION", "CORRESPONDING_JOBS"])
+df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION"])
 
 # Close cursor and database connection
 mycursor.close()
@@ -778,9 +743,8 @@ app.layout = html.Div(
             columns=[
                 {'id': "EMPLOYEE_ID", 'name': "Employee ID"},
                 {'id': "START", 'name': "Start Time"},
-                {'id': "STOP", 'name': "Stop Time"},
                 {'id': "DURATION", 'name': "Duration"},
-                {'id': "CORRESPONDING_JOBS", 'name': "Corresponding Jobs"}
+                {'id': "STOP", 'name': "Stop Time"}
             ],
             style_cell={'padding': '10px', 'text-align': 'center', 'border': '2px solid black'},
             style_header={'backgroundColor': '#f9c8be','fontWeight': 'bold'},
@@ -790,7 +754,7 @@ app.layout = html.Div(
         dcc.Graph(id='live-FTE-graph'),
         dcc.Interval(
             id='interval-component',
-            interval=3*1000, # in milliseconds
+            interval=5*1000, # in milliseconds
             n_intervals=0
         ),
     ]),
@@ -809,8 +773,11 @@ def update_metrics(n_intervals):
 
     # Close open jobs and employees at start of next day
     close_old_jobs_and_employees()
+    
+    # Check for warnings
+    check_for_warnings()
 
-    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
     # Remove milliseconds from datetime value
@@ -824,9 +791,9 @@ def update_metrics(n_intervals):
     df1 = pd.DataFrame(job_data, columns=["JOB_ID", "START", "STOP", "DURATION", "MAX_NO_FTES", "EMPLOYEES_PER_HOUR", "TOTAL_FTE_HOURS", "BREAK_TIME"])
 
     # Obtain updated job dataframe
-    mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION, CORRESPONDING_JOBS FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
+    mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
     employee_data = mycursor.fetchall()
-    df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION", "CORRESPONDING_JOBS"])
+    df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION"])
 
     # Update break time
     check_for_breaks()

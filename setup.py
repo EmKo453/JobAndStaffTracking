@@ -30,11 +30,9 @@ mqtt_port = 1883
 
 host = "127.0.0.1"
 
-#user="pi"
-user = "root"
+user="pi"
 
-#password="coby!!2"
-password = "winston!!2"
+password="coby!!2"
 
 database="jobstafftrackingdatabase"
 

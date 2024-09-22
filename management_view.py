@@ -64,12 +64,12 @@ mycursor = mydb.cursor()
 # Execute queries to obtain job and employee data
 mycursor.execute("SELECT JOB_ID, START, STOP, DURATION, MAX_NO_FTES, EMPLOYEES_PER_HOUR, TOTAL_FTE_HOURS FROM " + setup.job_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
 job_data = mycursor.fetchall()
-mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION, CORRESPONDING_JOBS FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
+mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([setup.Location_name]))
 employee_data = mycursor.fetchall()
 
 # Initialize dataframes for job and employee tables in dash app
 df1 = pd.DataFrame(job_data, columns=["JOB_ID", "START", "STOP", "DURATION", "MAX_NO_FTES", "EMPLOYEES_PER_HOUR", "TOTAL_FTE_HOURS"])
-df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION", "CORRESPONDING_JOBS"])
+df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION"])
 
 # Close cursor and database connection
 mycursor.close()
@@ -154,9 +154,8 @@ app.layout = html.Div(
             columns=[
                 {'id': "EMPLOYEE_ID", 'name': "Employee ID"},
                 {'id': "START", 'name': "Start Time"},
-                {'id': "STOP", 'name': "Stop Time"},
                 {'id': "DURATION", 'name': "Duration"},
-                {'id': "CORRESPONDING_JOBS", 'name': "Corresponding Jobs"}
+                {'id': "STOP", 'name': "Stop Time"}
             ],
             style_cell={'padding': '10px', 'text-align': 'center', 'border': '2px solid black'},
             style_header={'backgroundColor': '#f9c8be','fontWeight': 'bold'},
@@ -229,9 +228,9 @@ def update_metrics(n_intervals, location_value, graph_dropdown, input1):
     df1 = pd.DataFrame(job_data, columns=["JOB_ID", "START", "STOP", "DURATION", "MAX_NO_FTES", "EMPLOYEES_PER_HOUR", "TOTAL_FTE_HOURS"])
 
     # Employee data for a specific location
-    mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION, CORRESPONDING_JOBS FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([location_value]))
+    mycursor.execute("SELECT EMPLOYEE_ID, START, STOP, DURATION FROM " + setup.employee_table + " WHERE STOP IS NULL AND STATION=%s", ([location_value]))
     employee_data = mycursor.fetchall()
-    df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION", "CORRESPONDING_JOBS"])
+    df2 = pd.DataFrame(employee_data, columns=["EMPLOYEE_ID", "START", "STOP", "DURATION"])
     
     # Get the current time and date without milliseconds
     current_time = datetime.datetime.now()
