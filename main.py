@@ -656,9 +656,42 @@ def check_for_breaks():
     mydb.close()
 # CHECK_FOR_BREAKS  
 
+# DELETE_CLOSED_JOBS_AND_EMPLOYEES
+def delete_closed_jobs_and_employees():
+    # Deletes closed jobs and employees from the jobs and employees tables
+    # Timespan for deletion is defined in setup.py file
+    mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
+    mycursor = mydb.cursor()
+
+    # Return if negative number of days is specified
+    if (setup.clear_after_number_of_days < 0):
+        return
+
+    current_time = datetime.datetime.now()
+
+    # Delete all jobs that exceed the specified amount of days to be store in the database
+    mycursor.execute("SELECT * FROM " + setup.job_table + " WHERE STOP IS NOT NULL")
+    jobs = mycursor.fetchall()
+    for i in jobs:
+        if ((int((((current_time - convert_string_to_datetime(i[2])).days)))) >= setup.clear_after_number_of_days):
+            mycursor.execute("DELETE FROM " + setup.job_table + " WHERE JOB_ID=%s AND START=%s AND STOP=%s", (i[0], i[2], i[3]))
+
+    # Delete all employees that exceed the specified amount of days to be store in the database
+    mycursor.execute("SELECT * FROM " + setup.employee_table + " WHERE STOP IS NOT NULL")
+    employees = mycursor.fetchall()
+    for i in employees:
+        if ((int((((current_time - convert_string_to_datetime(i[2]))).days))) >= setup.clear_after_number_of_days):
+            mycursor.execute("DELETE FROM " + setup.employee_table + " WHERE EMPLOYEE_ID=%s AND START=%s AND STOP=%s", (i[0], i[2], i[3]))
+    mydb.commit()
+    mycursor.close()
+    mydb.close()
+# DELETE_CLOSED_JOBS_AND_EMPLOYEES
 
 ############################
 ##### START OF PROGRAM #####
+
+# Delete closed jobs and employees
+delete_closed_jobs_and_employees()
 
 # Close open jobs and employees that did not start today 
 close_old_jobs_and_employees()
