@@ -9,24 +9,24 @@ import plotly.graph_objects as go
 import plotly_express as px
 import setup
 
-# READ_SCANNER
-def read_scanner():
-    # Subscribe and listen to a topic of the MQTT broker for messages
-    # Call on_message when a message has been received
+# # READ_SCANNER
+# def read_scanner():
+#     # Subscribe and listen to a topic of the MQTT broker for messages
+#     # Call on_message when a message has been received
 
-    while True:
-        client.loop_start()
+#     while True:
+#         client.loop_start()
 
-        # Subscribe to topic
-        client.subscribe("+/feeds/jobs")
+#         # Subscribe to topic
+#         client.subscribe("+/feeds/jobs")
 
-        # Function call when message received
-        client.on_message= on_message
+#         # Function call when message received
+#         client.on_message= on_message
 
-        time.sleep(1)
+#         time.sleep(1)
 
-        client.loop_stop()
-# READ_SCANNER
+#         client.loop_stop()
+# # READ_SCANNER
 
 # ON_MESSAGE
 def on_message(client, userdata, message):
@@ -107,7 +107,6 @@ def add_job_scan_to_db_tables(id, timestamp, datetimestamp, location):
         mydb.commit()
 
         increment_maximum_FTEs(id)
-        add_corresponding_job_to_employees(id)
 
     mydb.commit()
     mycursor.close()
@@ -398,7 +397,7 @@ def calculate_total_FTE_hours(id, location, start, stop, current_time, break_tim
         if (start_time != None and end_time != None):
             total_FTE_hours = total_FTE_hours + (end_time - start_time - break_time)
                           
-    total_FTE_hours = str(total_FTE_hours)[0:7]
+    total_FTE_hours = str(total_FTE_hours)[0:8]
     mycursor.execute("UPDATE " + setup.job_table + " SET TOTAL_FTE_HOURS=%s WHERE JOB_ID=%s AND STATION=%s AND STOP IS NULL", (total_FTE_hours, id, location))
 
     mydb.commit()
@@ -510,7 +509,7 @@ def check_for_warnings():
 def check_for_multiple_open_jobs_or_employees():
     # Checks whether a job or employee is open at multiple stations at once
     # Adds a warning message if job/employee is open at multiple stations at once
-    print("here")
+
     mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
@@ -545,14 +544,12 @@ def check_for_multiple_open_jobs_or_employees():
     # If employee is open at multiple locations add warning message
     for j in employees:
         if (j[0] in employee_df.values):
-            print("yes")
             if (j[5] == None):
                 warning = "MULTIPLE OPEN EMPLOYEES"
                 mycursor.execute("UPDATE " + setup.employee_table + " SET WARNINGS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (warning, j[0], setup.Location_name))
             elif (j[5].find("MULTIPLE OPEN EMPLOYEES")):
                 warning = j[5] + ", MULTIPLE OPEN EMPLOYEES"
             mycursor.execute("UPDATE " + setup.employee_table + " SET WARNINGS=%s WHERE EMPLOYEE_ID=%s AND STATION=%s AND STOP IS NULL", (warning, j[0], setup.Location_name))
-    print("stop here")
     mydb.commit()
     mycursor.close()
     mydb.close()
@@ -624,22 +621,18 @@ def check_for_breaks():
 
     current_time = datetime.datetime.now().time()
 
-    # Obtain all break values
-    mycursor.execute("SELECT * FROM " + setup.break_table)
-    break_times = mycursor.fetchall()
-
     mycursor.execute("SELECT * FROM " + setup.employee_table + " WHERE STATION=%s AND STOP IS NULL", ([setup.Location_name]))
     employees = mycursor.fetchall()
 
     for i in employees:
         breakTime = 0
         start = convert_string_to_datetime(i[2])
-        for j in break_times:
+        for j in range(len(breaks)):
             # Convert break value from string to time type
-            breakT = datetime.time(int((str(j[0]))[0:2]), int((str(j[0]))[3:5]), int((str(j[0]))[6:8]))
+            breakT = datetime.time(int(breaks[j][0][0:2]),int(breaks[j][0][3:5]),int(breaks[j][0][6:8]))
             # If break occurred while job open, increment break value
             if (breakT >= start.time() and breakT <= current_time):
-                breakTime = breakTime + j[1]
+                breakTime = breakTime + int(breaks[j][1])
         if (i[6] != breakTime):
             mycursor.execute("UPDATE " + setup.employee_table + " SET BREAK_TIME=%s WHERE EMPLOYEE_ID=%s",(breakTime, i[0]))
 
@@ -649,19 +642,19 @@ def check_for_breaks():
     for i in jobs:
         breakTime = 0
         start = convert_string_to_datetime(i[2])
-        for j in break_times:
+        for j in range(len(breaks)):
             # Convert break value from string to time type
-            breakT = datetime.time(int((str(j[0]))[0:2]), int((str(j[0]))[3:5]), 0)
+            breakT = datetime.time(int(breaks[j][0][0:2]),int(breaks[j][0][3:5]),int(breaks[j][0][6:8]))
             # If break occurred while employee open, increment break value
             if (breakT >= start.time() and breakT <= current_time):
-                breakTime = breakTime + j[1]
+                breakTime = breakTime + int(breaks[j][1])
         if (i[9] != breakTime):
             mycursor.execute("UPDATE " + setup.job_table + " SET BREAK_TIME=%s WHERE JOB_ID=%s",(breakTime, i[0]))
 
     mydb.commit()
     mycursor.close()
     mydb.close()
-# CHECK_FOR_BREAKS   
+# CHECK_FOR_BREAKS  
 
 
 ############################
@@ -671,11 +664,17 @@ def check_for_breaks():
 close_old_jobs_and_employees()
 
 # Connect to mqtt broker
-client = mqtt.Client()
-client.connect(setup.mqttBroker,setup.mqtt_port,90)
+# client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+# client.connect(setup.mqttBroker,setup.mqtt_port,90)
 
-# Create thread to receive barcode scans
-threading.Thread(target = read_scanner, daemon = True).start()
+# # Create thread to receive barcode scans
+# threading.Thread(target = read_scanner, daemon = True).start()
+
+# read break times from text file
+breaks = []
+file = open("breaks.txt", "r").readlines()
+for lines in file:
+    breaks.append([lines[0:8], lines[10:12]])
 
 # Graph layout margin for dash app
 layout = go.Layout(
