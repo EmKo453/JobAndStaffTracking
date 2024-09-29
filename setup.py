@@ -16,6 +16,10 @@ Locations = ["Location 1", "Location 2", "Location 3"]
 
 LocationsAll = ["All Locations"] + Locations
 
+# Delete scans after 'x' amount of days
+# To stop deletion set to negative number
+clear_after_number_of_days = -1
+
 #######################
 ###   MQTT Broker   ###
 #######################
@@ -30,9 +34,9 @@ mqtt_port = 1883
 
 host = "127.0.0.1"
 
-user="pi"
+user="root"
 
-password="coby!!2"
+password="winston!!2"
 
 database="jobstafftrackingdatabase"
 
