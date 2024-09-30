@@ -347,8 +347,6 @@ def calculate_total_FTE_hours(id, location, start, stop, current_time, break_tim
     mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port)
     mycursor = mydb.cursor()
 
-    break_time = datetime.timedelta(hours=0, minutes=int(break_time), seconds=0)
-
     job_start_time = convert_string_to_datetime(start)
 
     total_FTE_hours = datetime.timedelta(hours=0, minutes=0, seconds=0)
@@ -393,8 +391,14 @@ def calculate_total_FTE_hours(id, location, start, stop, current_time, break_tim
         elif (employee_end_time < job_end_time):
             # Employee ends before job ends
             end_time = employee_end_time
-        
+
+        break_amount = 0
         if (start_time != None and end_time != None):
+            for k in range(len(breaks)):
+                breakT = datetime.time(int(breaks[k][0][0:2]),int(breaks[k][0][3:5]),int(breaks[k][0][6:8]))
+                if (breakT >= start_time.time() and breakT <= end_time.time()):
+                    break_amount = break_amount + int(breaks[k][1])
+            break_time = datetime.timedelta(hours=0, minutes=break_amount, seconds=0)
             total_FTE_hours = total_FTE_hours + (end_time - start_time - break_time)
                           
     total_FTE_hours = str(total_FTE_hours)[0:8]
