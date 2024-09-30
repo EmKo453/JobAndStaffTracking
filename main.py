@@ -667,6 +667,10 @@ def delete_closed_jobs_and_employees():
     mydb = mysql.connector.connect(host=setup.host, user=setup.user, password=setup.password, database=setup.database, port=setup.port, buffered=True)
     mycursor = mydb.cursor()
 
+    # Return if the number of days is not an integer
+    if (not isinstance(setup.clear_after_number_of_days, int)):
+        return
+
     # Return if negative number of days is specified
     if (setup.clear_after_number_of_days < 0):
         return
